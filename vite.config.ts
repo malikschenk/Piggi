@@ -5,7 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: './Piggi',
+    base: '/Piggi/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
