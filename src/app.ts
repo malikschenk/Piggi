@@ -1342,6 +1342,79 @@ function executeAction(act: any): string | null {
     return null;
 }
 
+async function callGeminiDirectly(userPrompt: string, apiKey: string) {
+    const systemPrompt = `You are PiggiAI, the smart financial budgeting assistant inside the Piggi web app.
+Analyze the user's message (which may be in German, English, etc.) and respond with a helpful, friendly message and executable actions.
+Output MUST be a valid JSON object matching this schema:
+{
+  "reply": "Friendly response string summarizing actions or answering financial questions.",
+  "actions": [
+    { "action": "action_name", ...params }
+  ]
+}
+
+Supported Actions in the "actions" array:
+1. Balance:
+   - {"action": "set_balance", "amount": 500}
+   - {"action": "adjust_balance", "amount": -20}
+2. Monthly Income:
+   - {"action": "add_income", "name": "Salary", "amount": 2000}
+   - {"action": "edit_income", "name": "Salary", "amount": 2200}
+   - {"action": "delete_income", "name": "Salary"}
+3. Monthly Expenses:
+   - {"action": "add_expense", "name": "Rent", "amount": 800}
+   - {"action": "edit_expense", "name": "Rent", "amount": 850}
+   - {"action": "delete_expense", "name": "Rent"}
+4. Savings Goals:
+   - {"action": "add_goal", "name": "MacBook", "amount": 1200}
+   - {"action": "edit_goal", "name": "MacBook", "amount": 1400}
+   - {"action": "delete_goal", "name": "MacBook"}
+5. App Settings:
+   - {"action": "set_theme", "theme": "dark" | "light"}
+   - {"action": "change_avatar", "initial": "P"}
+   - {"action": "change_currency", "currency": "USD" | "EUR" | "JPY"}
+
+CURRENT CONTEXT:
+${JSON.stringify({
+    currentBalance,
+    currency: currentCurrency,
+    avatarSymbol,
+    isDarkMode: document.body.classList.contains('dark-mode'),
+    savingGoals,
+    incomeSources,
+    expenseSources,
+}, null, 2)}
+
+Provide only valid JSON. If no database action is needed, return empty actions array [].`;
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ parts: [{ text: userPrompt }] }],
+            generationConfig: {
+                responseMimeType: 'application/json',
+            },
+        }),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `API error ${res.status}`);
+    }
+
+    const data = await res.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '{}';
+    try {
+        return JSON.parse(rawText);
+    } catch {
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (match) return JSON.parse(match[0]);
+        return { reply: rawText, actions: [] };
+    }
+}
+
 async function handleSendAiMessage() {
     if (!mainInput) return;
     const userPrompt = mainInput.value.trim();
@@ -1359,50 +1432,67 @@ async function handleSendAiMessage() {
     const activeKey = localStorage.getItem('gemini_api_key') || '';
 
     try {
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: userPrompt,
-                apiKey: activeKey,
-                context: {
-                    currentBalance,
-                    currency: currentCurrency,
-                    avatarSymbol,
-                    isDarkMode: document.body.classList.contains('dark-mode'),
-                    savingGoals,
-                    incomeSources,
-                    expenseSources,
-                },
-            }),
-        });
+        let data: any = null;
+        let responseSuccess = false;
+
+        // First attempt server-side proxy
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: userPrompt,
+                    apiKey: activeKey,
+                    context: {
+                        currentBalance,
+                        currency: currentCurrency,
+                        avatarSymbol,
+                        isDarkMode: document.body.classList.contains('dark-mode'),
+                        savingGoals,
+                        incomeSources,
+                        expenseSources,
+                    },
+                }),
+            });
+
+            if (response.ok) {
+                data = await response.json();
+                responseSuccess = true;
+            }
+        } catch {
+            // Server route unavailable (e.g. static GitHub Pages)
+        }
+
+        // Fallback for static hosting (GitHub Pages) with client key
+        if (!responseSuccess) {
+            if (activeKey) {
+                data = await callGeminiDirectly(userPrompt, activeKey);
+                responseSuccess = true;
+            } else {
+                removeAiTyping();
+                addChatMessage('ai', 'Please enter your Gemini API Key in Settings > API Key to use PiggiAI on static hosting.');
+                return;
+            }
+        }
 
         removeAiTyping();
 
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            const errMsg = errData.error || `Server responded with ${response.status}`;
-            addChatMessage('ai', `I ran into an issue: ${errMsg}`);
-            return;
-        }
-
-        const data = await response.json();
         const actionBadges: string[] = [];
 
-        if (data.actions && Array.isArray(data.actions)) {
+        if (data?.actions && Array.isArray(data.actions)) {
             data.actions.forEach((act: any) => {
                 const badge = executeAction(act);
                 if (badge) actionBadges.push(badge);
             });
         }
 
-        const reply = data.reply || (actionBadges.length > 0 ? 'I updated your budget!' : 'Done!');
+        const reply = data?.reply || (actionBadges.length > 0 ? 'I updated your budget!' : 'Done!');
         addChatMessage('ai', reply, actionBadges);
 
     } catch (err: any) {
         removeAiTyping();
         console.error('Failed to communicate with PiggiAI:', err);
-        addChatMessage('ai', 'Sorry, I had trouble processing that request. Please try again.');
+        addChatMessage('ai', `Sorry, I had trouble processing that request: ${err.message || 'Please check your API key.'}`);
     }
 }
 
