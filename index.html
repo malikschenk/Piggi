@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Piggi - Personal Finance & AI Budgeting</title>
+    <meta name="description" content="A minimalist budget and finance tracker with AI assistant PiggiAI, custom currencies, savings goals, income and expense tracking.">
+    <meta property="og:title" content="Piggi - Personal Finance & AI Budgeting">
+    <meta property="og:description" content="A minimalist budget and finance tracker with AI assistant PiggiAI, custom currencies, savings goals, income and expense tracking.">
+    <meta property="og:type" content="website">
+    <link rel="stylesheet" href="/src/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="app-container">
+
+        <header class="app-header">
+            <h1 class="app-title">Piggi</h1>
+            <div class="profile-avatar" id="profile-trigger" style="cursor: pointer;" title="Settings">P</div>
+        </header>
+
+        <div class="fade-overlay-top"></div>
+
+        <main class="content-area" id="content-area">
+
+            <div class="tr-card" id="balance-card">
+                <span class="card-label">Balance</span>
+                <h1 class="total-amount" id="main-balance-value">0.00</h1>
+            </div>
+
+            <div class="tr-card" id="goals-card">
+                <span class="card-label">Savings Goals</span>
+                <div class="goals-list" id="main-goals-list"></div>
+            </div>
+
+            <div class="tr-card" id="stats-card">
+                <span class="card-label">Stats</span>
+                <div class="stats-preview-container" id="main-stats-preview">
+                    <div class="stats-preview-info">
+                        <span class="stats-trend-badge" id="stats-trend-badge">+0.00/mo</span>
+                        <span class="stats-mini-caption">History & Forecast</span>
+                    </div>
+                    <div class="stats-sparkline-wrap" id="main-stats-sparkline">
+                        <!-- Mini SVG chart injected by app.ts -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="tr-card" id="income-card">
+                <span class="card-label">Monthly Income</span>
+                <div class="income-list" id="main-income-list"></div>
+            </div>
+
+            <div class="tr-card" id="expenses-card">
+                <span class="card-label">Monthly Expenses</span>
+                <div class="expense-list" id="main-expense-list"></div>
+            </div>
+
+        </main>
+
+        <div class="fade-overlay-bottom"></div>
+
+        <footer class="app-footer" id="app-footer">
+            <div class="input-bar-container" id="footer-input-container">
+                <textarea id="main-input" placeholder="Ask PiggiAI..." rows="1" maxlength="200" autocomplete="off"></textarea>
+                <button class="icon-btn" id="send-btn" aria-label="Send message to PiggiAI">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="19" x2="12" y2="5"></line>
+                        <polyline points="5 12 12 5 19 12"></polyline>
+                    </svg>
+                </button>
+            </div>
+        </footer>
+
+        <!-- Balance Modal -->
+        <div class="modal-overlay" id="balance-modal">
+            <div class="bottom-sheet">
+                <div class="drag-handle-container" id="btn-close-balance">
+                    <div class="drag-handle"></div>
+                </div>
+                <div class="sheet-slider" id="balance-slider" data-active-slide="0">
+                    <div class="sheet-slides">
+                        <div class="sheet-slide" id="balance-slide-main">
+                            <header class="sheet-header">
+                                <h1 class="app-title">Balance</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="balance-section">
+                                    <span class="card-label">Current Balance</span>
+                                    <h1 class="total-amount big-green" id="modal-balance-value">0.00</h1>
+                                </div>
+                                <div class="options-list" style="margin-top: auto; padding-top: 24px; gap: 8px;">
+                                    <button class="option-item btn-primary" id="btn-add-funds">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Add Funds</span>
+                                    </button>
+                                    <button class="option-item btn-primary" id="btn-subtract-funds">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Subtract Funds</span>
+                                    </button>
+                                    <button class="option-item btn-primary" id="btn-edit-balance">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Edit Balance</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sheet-slide" id="balance-slide-edit">
+                            <header class="sheet-header">
+                                <h1 class="app-title" id="edit-balance-title">Edit Balance</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="balance-section">
+                                    <span class="card-label" id="edit-balance-label">New Balance</span>
+                                    <input type="text" id="input-balance" class="edit-input" placeholder="0.00" autocomplete="off" inputmode="decimal">
+                                    <span class="error-msg" id="error-balance">Numbers only</span>
+                                </div>
+                                <div class="options-list" style="margin-top: auto; padding-top: 24px; gap: 8px;">
+                                    <button class="option-item btn-primary" id="btn-save-balance">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Done</span>
+                                    </button>
+                                    <button class="option-item" id="btn-cancel-balance" style="justify-content: center;">
+                                        <span class="option-text" style="color: #888888; text-align: center; width: 100%;">Cancel</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Savings Goals Modal -->
+        <div class="modal-overlay" id="goals-modal">
+            <div class="bottom-sheet">
+                <div class="drag-handle-container" id="btn-close-goals">
+                    <div class="drag-handle"></div>
+                </div>
+                <div class="sheet-slider" id="goals-slider" data-active-slide="0">
+                    <div class="sheet-slides">
+                        <div class="sheet-slide" id="goals-slide-main">
+                            <header class="sheet-header">
+                                <h1 class="app-title">Savings Goals</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="balance-section">
+                                    <span class="card-label">Total Savings Goal</span>
+                                    <h1 class="total-amount" id="total-goal-amount" style="color: #000000;">0.00</h1>
+                                </div>
+                                <div class="goals-list" id="modal-goals-list"></div>
+                                <div class="options-list" style="margin-top: auto; padding-top: 24px;">
+                                    <button class="option-item btn-primary" id="btn-to-edit-goals">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Edit Savings Goals</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sheet-slide" id="goals-slide-edit">
+                            <header class="sheet-header">
+                                <h1 class="app-title">Edit Savings Goals</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="goals-list" id="modal-goals-list-edit" style="gap: 16px;"></div>
+                                <div class="options-list" style="margin-top: auto; padding-top: 24px; display: flex; flex-direction: column; gap: 8px;">
+                                    <button class="option-item btn-primary" id="btn-to-add-goal">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Add New Goal</span>
+                                    </button>
+                                    <button class="option-item btn-primary" id="btn-save-goals-edit">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Done</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sheet-slide" id="goals-slide-add">
+                            <header class="sheet-header">
+                                <h1 class="app-title" id="add-goal-header-title">Add Goal</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="balance-section">
+                                    <span class="card-label">Goal Name</span>
+                                    <input type="text" id="input-goal-name" class="edit-input" placeholder="Name" maxlength="18" autocomplete="off">
+                                </div>
+                                <div class="balance-section" style="margin-top: 16px;">
+                                    <span class="card-label">Amount</span>
+                                    <input type="text" id="input-goal-price" class="edit-input" placeholder="0.00" autocomplete="off" inputmode="decimal">
+                                    <span class="error-msg" id="error-goal-price">Numbers only</span>
+                                </div>
+                                <div class="options-list" style="margin-top: auto; padding-top: 24px; gap: 12px;">
+                                    <button class="option-item btn-primary" id="btn-submit-goal">
+                                        <span class="option-text" id="btn-submit-goal-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Add</span>
+                                    </button>
+                                    <button class="option-item" id="btn-cancel-add-goal" style="justify-content: center;">
+                                        <span class="option-text" style="color: #888888; text-align: center; width: 100%;">Cancel</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Modal -->
+        <div class="modal-overlay" id="stats-modal">
+            <div class="bottom-sheet">
+                <div class="drag-handle-container" id="btn-close-stats">
+                    <div class="drag-handle"></div>
+                </div>
+                <div class="sheet-slider" id="stats-slider" data-active-slide="0">
+                    <div class="sheet-slides">
+                        <div class="sheet-slide" id="stats-slide-main">
+                            <header class="sheet-header">
+                                <h1 class="app-title">Stats</h1>
+                            </header>
+                            <div class="sheet-content stats-modal-content">
+                                <div class="stats-summary-bar">
+                                    <div class="stats-summary-col">
+                                        <span class="card-label">Monthly Net</span>
+                                        <h2 class="stats-net-value" id="stats-modal-net">+0.00</h2>
+                                    </div>
+                                    <div class="stats-summary-col" style="text-align: right;">
+                                        <span class="card-label">Current Balance</span>
+                                        <h2 class="stats-balance-value" id="stats-modal-balance">0.00</h2>
+                                    </div>
+                                </div>
+
+                                <div class="stats-chart-card">
+                                    <div class="stats-chart-legend">
+                                        <div class="legend-item"><span class="legend-dot history-dot"></span> Past Balance</div>
+                                        <div class="legend-item"><span class="legend-dot current-dot"></span> Today</div>
+                                        <div class="legend-item"><span class="legend-dot forecast-dot"></span> Forecast</div>
+                                    </div>
+                                    <div class="stats-svg-container" id="stats-svg-container">
+                                        <!-- Interactive SVG graph rendered by app.ts -->
+                                    </div>
+                                </div>
+
+                                <div class="stats-details-row">
+                                    <div class="stats-pill">
+                                        <span class="stats-pill-title">Income</span>
+                                        <span class="stats-pill-num price-green" id="stats-pill-income">0.00</span>
+                                    </div>
+                                    <div class="stats-pill">
+                                        <span class="stats-pill-title">Expenses</span>
+                                        <span class="stats-pill-num price-red" id="stats-pill-expense">0.00</span>
+                                    </div>
+                                    <div class="stats-pill">
+                                        <span class="stats-pill-title">Progression</span>
+                                        <span class="stats-pill-num" id="stats-pill-progression">0.00 / mo</span>
+                                    </div>
+                                </div>
+
+                                <div class="stats-forecast-note" id="stats-forecast-note">
+                                    Forecast is calculated from your current balance and monthly net (Income - Expenses).
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Income Modal -->
+        <div class="modal-overlay" id="income-modal">
+            <div class="bottom-sheet">
+                <div class="drag-handle-container" id="btn-close-income">
+                    <div class="drag-handle"></div>
+                </div>
+                <div class="sheet-slider" id="income-slider" data-active-slide="0">
+                    <div class="sheet-slides">
+                        <div class="sheet-slide" id="income-slide-main">
+                            <header class="sheet-header">
+                                <h1 class="app-title">Monthly Income</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="balance-section">
+                                    <span class="card-label">Total Monthly Income</span>
+                                    <h1 class="total-amount price-green" id="modal-income-value">0.00</h1>
+                                </div>
+                                <div class="income-list" id="modal-income-list"></div>
+                                <div class="options-list" style="margin-top: auto; padding-top: 24px;">
+                                    <button class="option-item btn-primary" id="btn-to-edit-income">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Edit Monthly Income</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sheet-slide" id="income-slide-edit">
+                            <header class="sheet-header">
+                                <h1 class="app-title">Edit Monthly Income</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="income-list" id="modal-income-list-edit" style="gap: 16px;"></div>
+                                <div class="options-list" style="margin-top: auto; padding-top: 24px; display: flex; flex-direction: column; gap: 8px;">
+                                    <button class="option-item btn-primary" id="btn-to-add-income">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Add Monthly Income</span>
+                                    </button>
+                                    <button class="option-item btn-primary" id="btn-save-income-edit">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Done</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sheet-slide" id="income-slide-add">
+                            <header class="sheet-header">
+                                <h1 class="app-title" id="add-income-header-title">Add Monthly Income</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="balance-section">
+                                    <span class="card-label">Monthly Income Name</span>
+                                    <input type="text" id="input-income-name" class="edit-input" placeholder="Name" maxlength="18" autocomplete="off">
+                                </div>
+                                <div class="balance-section" style="margin-top: 16px;">
+                                    <span class="card-label">Amount</span>
+                                    <input type="text" id="input-income-amount" class="edit-input" placeholder="0.00" autocomplete="off" inputmode="decimal">
+                                    <span class="error-msg" id="error-income-amount">Numbers only</span>
+                                </div>
+                                <div class="options-list" style="margin-top: auto; padding-top: 24px; gap: 12px;">
+                                    <button class="option-item btn-primary" id="btn-submit-income">
+                                        <span class="option-text" id="btn-submit-income-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Add</span>
+                                    </button>
+                                    <button class="option-item" id="btn-cancel-add-income" style="justify-content: center;">
+                                        <span class="option-text" style="color: #888888; text-align: center; width: 100%;">Cancel</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Expenses Modal -->
+        <div class="modal-overlay" id="expenses-modal">
+            <div class="bottom-sheet">
+                <div class="drag-handle-container" id="btn-close-expenses">
+                    <div class="drag-handle"></div>
+                </div>
+                <div class="sheet-slider" id="expenses-slider" data-active-slide="0">
+                    <div class="sheet-slides">
+                        <div class="sheet-slide" id="expenses-slide-main">
+                            <header class="sheet-header">
+                                <h1 class="app-title">Monthly Expenses</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="balance-section">
+                                    <span class="card-label">Total Monthly Expenses</span>
+                                    <h1 class="total-amount price-red" id="modal-expense-value">0.00</h1>
+                                </div>
+                                <div class="expense-list" id="modal-expense-list"></div>
+                                <div class="options-list" style="margin-top: auto; padding-top: 24px;">
+                                    <button class="option-item btn-primary" id="btn-to-edit-expense">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Edit Monthly Expenses</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sheet-slide" id="expenses-slide-edit">
+                            <header class="sheet-header">
+                                <h1 class="app-title">Edit Monthly Expenses</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="expense-list" id="modal-expense-list-edit" style="gap: 16px;"></div>
+                                <div class="options-list" style="margin-top: auto; padding-top: 24px; display: flex; flex-direction: column; gap: 8px;">
+                                    <button class="option-item btn-primary" id="btn-to-add-expense">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Add Monthly Expenses</span>
+                                    </button>
+                                    <button class="option-item btn-primary" id="btn-save-expense-edit">
+                                        <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Done</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sheet-slide" id="expenses-slide-add">
+                            <header class="sheet-header">
+                                <h1 class="app-title" id="add-expense-header-title">Add Monthly Expenses</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="balance-section">
+                                    <span class="card-label">Monthly Expenses Name</span>
+                                    <input type="text" id="input-expense-name" class="edit-input" placeholder="Name" maxlength="18" autocomplete="off">
+                                </div>
+                                <div class="balance-section" style="margin-top: 16px;">
+                                    <span class="card-label">Amount</span>
+                                    <input type="text" id="input-expense-amount" class="edit-input" placeholder="0.00" autocomplete="off" inputmode="decimal">
+                                    <span class="error-msg" id="error-expense-amount">Numbers only</span>
+                                </div>
+                                <div class="options-list" style="margin-top: auto; padding-top: 24px; gap: 12px;">
+                                    <button class="option-item btn-primary" id="btn-submit-expense">
+                                        <span class="option-text" id="btn-submit-expense-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Add</span>
+                                    </button>
+                                    <button class="option-item" id="btn-cancel-add-expense" style="justify-content: center;">
+                                        <span class="option-text" style="color: #888888; text-align: center; width: 100%;">Cancel</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings (Profile) Modal -->
+        <div class="modal-overlay" id="profile-modal">
+            <div class="bottom-sheet">
+                <div class="drag-handle-container" id="btn-close-profile-overlay">
+                    <div class="drag-handle"></div>
+                </div>
+                <div class="sheet-slider profile-tree-slider" id="profile-slider" data-active-slide="0">
+                    <div class="sheet-slides">
+                        <div class="sheet-slide main-settings-slide">
+                            <header class="sheet-header">
+                                <h1 class="app-title">Settings</h1>
+                            </header>
+                            <div class="sheet-content">
+                                <div class="options-list">
+                                    <button class="option-item" id="btn-to-appearance">
+                                        <span class="option-text">Appearance</span>
+                                        <span class="arrow">›</span>
+                                    </button>
+                                    <div class="card-divider"></div>
+                                    <button class="option-item" id="btn-to-currency">
+                                        <span class="option-text">Currency</span>
+                                        <span class="arrow">›</span>
+                                    </button>
+                                    <div class="card-divider"></div>
+                                    <button class="option-item" id="btn-to-edit-profile">
+                                        <span class="option-text">Avatar Letter</span>
+                                        <span class="arrow">›</span>
+                                    </button>
+                                    <div class="card-divider"></div>
+                                    <button class="option-item" id="btn-to-api-key">
+                                        <span class="option-text">API Key</span>
+                                        <span class="arrow">›</span>
+                                    </button>
+                                    <div class="card-divider"></div>
+                                    <button class="option-item" id="btn-to-reset">
+                                        <span class="option-text">Reset Data</span>
+                                        <span class="arrow">›</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sheet-slide branch-slides-container">
+                            <!-- Branch 1: Appearance -->
+                            <div class="branch-slide appearance-branch-slide">
+                                <header class="sheet-header">
+                                    <h1 class="app-title">Appearance</h1>
+                                </header>
+                                <div class="sheet-content">
+                                    <div class="options-list">
+                                        <button class="option-item" id="btn-light-mode">
+                                            <span class="option-text">Light Mode</span>
+                                            <span id="check-light" class="checkmark">✓</span>
+                                        </button>
+                                        <div class="card-divider"></div>
+                                        <button class="option-item" id="btn-dark-mode">
+                                            <span class="option-text">Dark Mode</span>
+                                            <span id="check-dark" class="checkmark">✓</span>
+                                        </button>
+                                    </div>
+                                    <div class="options-list" style="margin-top: auto; padding-top: 24px;">
+                                        <button class="option-item btn-primary" id="btn-back-to-profile">
+                                            <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Done</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Branch 2: Currency (USD, EUR, JPY) -->
+                            <div class="branch-slide currency-branch-slide">
+                                <header class="sheet-header">
+                                    <h1 class="app-title">Currency</h1>
+                                </header>
+                                <div class="sheet-content">
+                                    <div class="options-list">
+                                        <button class="option-item" id="btn-currency-usd">
+                                            <span class="option-text">USD ($)</span>
+                                            <span id="check-currency-usd" class="checkmark">✓</span>
+                                        </button>
+                                        <div class="card-divider"></div>
+                                        <button class="option-item" id="btn-currency-eur">
+                                            <span class="option-text">EUR (€)</span>
+                                            <span id="check-currency-eur" class="checkmark">✓</span>
+                                        </button>
+                                        <div class="card-divider"></div>
+                                        <button class="option-item" id="btn-currency-jpy">
+                                            <span class="option-text">JPY (¥)</span>
+                                            <span id="check-currency-jpy" class="checkmark">✓</span>
+                                        </button>
+                                    </div>
+                                    <div class="options-list" style="margin-top: auto; padding-top: 24px;">
+                                        <button class="option-item btn-primary" id="btn-back-to-profile-currency">
+                                            <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Done</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Branch 3: Avatar Letter (Circle instead of wide box) -->
+                            <div class="branch-slide editprofile-branch-slide">
+                                <header class="sheet-header">
+                                    <h1 class="app-title">Avatar Letter</h1>
+                                </header>
+                                <div class="sheet-content avatar-branch-content">
+                                    <div class="avatar-edit-wrapper">
+                                        <div class="avatar-circle-wrapper" id="avatar-circle-wrapper">
+                                            <input type="text" id="input-avatar-symbol" class="avatar-circle-input" maxlength="1" placeholder="P" autocomplete="off" spellcheck="false" aria-label="Avatar letter">
+                                        </div>
+                                    </div>
+                                    <div class="options-list" style="margin-top: auto; padding-top: 24px; width: 100%; display: flex; flex-direction: column; gap: 8px;">
+                                        <button class="option-item btn-primary" id="btn-save-avatar">
+                                            <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Save</span>
+                                        </button>
+                                        <button class="option-item" id="btn-back-to-profile-avatar" style="justify-content: center;">
+                                            <span class="option-text" style="color: #888888; text-align: center; width: 100%;">Cancel</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Branch 4: API Key -->
+                            <div class="branch-slide apikey-branch-slide">
+                                <header class="sheet-header">
+                                    <h1 class="app-title">API Key</h1>
+                                </header>
+                                <div class="sheet-content">
+                                    <input type="password" id="input-api-key" class="edit-input" placeholder="Gemini API Key" autocomplete="off" style="margin-top: 4px;">
+                                    <div class="options-list" style="margin-top: auto; padding-top: 24px; display: flex; flex-direction: column; gap: 8px;">
+                                        <button class="option-item btn-primary" id="btn-save-api-key">
+                                            <span class="option-text" style="color: #ffffff; text-align: center; width: 100%; font-weight: 600;">Save Key</span>
+                                        </button>
+                                        <button class="option-item" id="btn-back-to-profile-api" style="justify-content: center;">
+                                            <span class="option-text" style="color: #888888; text-align: center; width: 100%;">Cancel</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Branch 5: Reset Data -->
+                            <div class="branch-slide reset-branch-slide">
+                                <header class="sheet-header">
+                                    <h1 class="app-title">Reset Data</h1>
+                                </header>
+                                <div class="sheet-content">
+                                    <p class="smart-text" style="text-align: center; margin-top: 24px; font-weight: 500;">
+                                        Are you sure you want to reset all data?
+                                    </p>
+                                    <div class="options-list" style="margin-top: auto; padding-top: 24px; display: flex; flex-direction: column; gap: 8px;">
+                                        <button class="option-item btn-danger" id="btn-confirm-reset">
+                                            <span class="option-text" style="text-align: center; width: 100%; font-weight: 600;">Reset Data</span>
+                                        </button>
+                                        <button class="option-item" id="btn-cancel-reset" style="justify-content: center;">
+                                            <span class="option-text" style="color: #888888; text-align: center; width: 100%;">Cancel</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PiggiAI Repaired Modal & Mask -->
+        <div id="modal-ai" class="modal-overlay ai-modal-overlay">
+            <div class="modal-mask" id="ai-modal-mask"></div>
+            <div class="bottom-sheet ai-bottom-sheet">
+                <div class="drag-handle-container" id="btn-close-ai">
+                    <div class="drag-handle"></div>
+                </div>
+                <header class="sheet-header ai-sheet-header">
+                    <h1 class="app-title">PiggiAI</h1>
+                </header>
+                <div class="sheet-content ai-sheet-content">
+                    <div class="chat-container" id="ai-chat-history">
+                        <div id="ai-initial-greeting" class="ai-greeting-text">Hello! How can I help you today?</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module" src="/src/app.ts"></script>
+</body>
+
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "Piggi - Personal Finance & AI Budgeting",
+  "description": "A minimalist budget and finance tracker with AI assistant PiggiAI, custom currencies, savings goals, income and expense tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
+
