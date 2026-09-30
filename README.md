@@ -2,7 +2,7 @@
 
 Piggi is a smart savings app that helps you to keep an eye on your income and expenses and helps you reach your goals. <br>
 Piggi is live on [Pages](https://malikschenk.github.io/Piggi/), check it out!
-This project is also documented on [Hack CLub Stardance](https://stardance.hackclub.com/projects/33818).
+This project is also documented on [Hack Club Stardance](https://stardance.hackclub.com/projects/33818).
 
 ## Features 
 
