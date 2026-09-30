@@ -1,20 +1,33 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Piggi
 
-# Run and deploy your AI Studio app
+Piggi is a smart savings app that helps you to keep an eye on your income and expenses and helps you reach your goals. <br>
+Piggi is live on [Pages](https://malikschenk.github.io/Piggi/), check it out!
+This project is also documented on [Hack CLub Stardance](https://stardance.hackclub.com/projects/33818).
 
-This contains everything you need to run your app locally.
+## Features 
 
-View your app in AI Studio: https://ai.studio/apps/a8f2c257-c53a-4658-be3c-c6f1357cbac3
+- Set and edit your balance
+- Set saving goals
+- Add monthly income and expenses
+- Check Stats like your savings rate
+- See when you reach your goals
+- Calculate your balance and reached goals at a date
+- Built-in AI
 
-## Run Locally
+- White/Dark mode
+- Different currencies
 
-**Prerequisites:**  Node.js
+## PiggiAI
 
+PiggiAI is the built-in AI that runs via your Gemini API key. You can get it [here](https://aistudio.google.com/api-keys) for free. <br>
+Just create a new key, copy it and paste it in Settings > API key. Now you can use PiggiAI to set goals, calculate dates, change colors, ask questions and more...
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Data
+
+All your data and your key is securely saved in the local storage of your browser and never leaves you device. <br>
+You can reset and delete all your data with just two clicks (Settings > Reset Data).
+
+## How it works
+
+I used Google AI Studio to create this app, it's a useful tool! The app is built with Vite, React, TypeScript and Tailwind CSS. <br>
+PiggiAI takes your prompt and creates a JSON with Gemini to use the features and to give you a helpful answer.
