@@ -8,10 +8,15 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
+const isHackClubKey = (key: string): boolean => {
+  const k = key.trim();
+  return k.startsWith('sk-hc-') || k.startsWith('hc-') || k.startsWith('sk-');
+};
+
 const getAiClient = (customKey?: string) => {
   let rawKey = (customKey && customKey.trim().length > 0) ? customKey.trim() : '';
   rawKey = rawKey.replace(/^['"]|['"]$/g, '').trim();
-  if (!rawKey) return null;
+  if (!rawKey || isHackClubKey(rawKey)) return null;
   return new GoogleGenAI({
     apiKey: rawKey,
   });
@@ -25,8 +30,11 @@ app.post('/api/chat', async (req, res) => {
       return;
     }
 
-    let ai = getAiClient(apiKey);
-    if (!ai) {
+    const effectiveKey = (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 0)
+      ? apiKey.trim().replace(/^['"]|['"]$/g, '')
+      : (process.env.GEMINI_API_KEY || process.env.API_KEY || '').trim();
+
+    if (!effectiveKey) {
       res.status(400).json({
         error: 'KEY_EMPTY'
       });
@@ -77,80 +85,111 @@ ${JSON.stringify(context || {}, null, 2)}
 
 Output ONLY valid JSON.`;
 
-    const modelsToTry = [
-      'gemini-3.8-flash',
-      'gemini-3.1-flash-lite',
-      'gemini-flash-latest',
-    ];
     let lastError: any = null;
-    let response: any = null;
+    let textResponse: string | null = null;
 
-    // Helper to run models with SDK and REST fallback
-    const runGeneration = async (client: GoogleGenAI, keyToUse: string) => {
-      // 1. Try SDK
-      for (const model of modelsToTry) {
+    if (isHackClubKey(effectiveKey)) {
+      const hcModels = [
+        'openai/gpt-4o-mini',
+        'google/gemini-2.0-flash-001',
+        'meta-llama/llama-3.3-70b-instruct',
+      ];
+      for (const model of hcModels) {
         try {
-          const res = await client.models.generateContent({
-            model,
-            contents: message,
-            config: {
-              systemInstruction: systemPrompt,
-              responseMimeType: 'application/json',
-            },
-          });
-          if (res?.text) return res.text;
-        } catch (err: any) {
-          lastError = err;
-          console.error(`Gemini SDK model ${model} error:`, err?.message || err);
-        }
-      }
-
-      // 2. Direct REST fallback on server if SDK fails
-      for (const model of modelsToTry) {
-        try {
-          const restRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keyToUse}`, {
+          const hcRes = await fetch('https://ai.hackclub.com/proxy/v1/chat/completions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${effectiveKey}`,
+            },
             body: JSON.stringify({
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              contents: [{ parts: [{ text: message }] }],
-              generationConfig: { responseMimeType: 'application/json' },
+              model,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: message },
+              ],
+              response_format: { type: 'json_object' },
             }),
           });
-          if (restRes.ok) {
-            const data: any = await restRes.json();
-            const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (textOutput) return textOutput;
+          if (hcRes.ok) {
+            const hcData: any = await hcRes.json();
+            const text = hcData.choices?.[0]?.message?.content?.trim();
+            if (text) {
+              textResponse = text;
+              break;
+            }
           } else {
-            const errBody = await restRes.text();
-            console.error(`Gemini REST model ${model} error:`, errBody);
+            const errBody = await hcRes.text();
+            lastError = new Error(`Hack Club AI error: ${errBody}`);
           }
         } catch (err: any) {
           lastError = err;
-          console.error(`Gemini REST fetch ${model} error:`, err?.message || err);
+        }
+      }
+    } else {
+      const ai = getAiClient(effectiveKey);
+      const modelsToTry = [
+        'gemini-3.8-flash',
+        'gemini-3.1-flash-lite',
+        'gemini-flash-latest',
+      ];
+
+      if (ai) {
+        for (const model of modelsToTry) {
+          try {
+            const res = await ai.models.generateContent({
+              model,
+              contents: message,
+              config: {
+                systemInstruction: systemPrompt,
+                responseMimeType: 'application/json',
+              },
+            });
+            if (res?.text) {
+              textResponse = res.text;
+              break;
+            }
+          } catch (err: any) {
+            lastError = err;
+          }
         }
       }
 
-      return null;
-    };
-
-    const effectiveKey = (apiKey && apiKey.trim().length > 0) ? apiKey.trim().replace(/^['"]|['"]$/g, '') : (process.env.GEMINI_API_KEY || process.env.API_KEY || '');
-    let textResponse = await runGeneration(ai, effectiveKey);
-
-    // If client key failed, try server key if different
-    const serverKey = (process.env.GEMINI_API_KEY || process.env.API_KEY || '').trim().replace(/^['"]|['"]$/g, '');
-    if (!textResponse && serverKey && effectiveKey !== serverKey) {
-      const serverAi = getAiClient();
-      if (serverAi) {
-        textResponse = await runGeneration(serverAi, serverKey);
+      if (!textResponse) {
+        for (const model of modelsToTry) {
+          try {
+            const restRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${effectiveKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                contents: [{ parts: [{ text: message }] }],
+                generationConfig: { responseMimeType: 'application/json' },
+              }),
+            });
+            if (restRes.ok) {
+              const data: any = await restRes.json();
+              const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (textOutput) {
+                textResponse = textOutput;
+                break;
+              }
+            } else {
+              const errBody = await restRes.text();
+              lastError = new Error(`Gemini REST error: ${errBody}`);
+            }
+          } catch (err: any) {
+            lastError = err;
+          }
+        }
       }
     }
 
     if (!textResponse) {
-      throw lastError || new Error('Failed to generate response from Gemini models');
+      throw lastError || new Error('Failed to generate response from AI models');
     }
 
-    const text = typeof textResponse === 'string' ? textResponse.trim() : (textResponse?.text?.trim() || '{}');
+    const text = (textResponse || '{}').trim();
     let parsedData;
     try {
       parsedData = JSON.parse(text);
@@ -167,10 +206,8 @@ Output ONLY valid JSON.`;
   } catch (error: any) {
     const rawMsg = error?.message || '';
     const lower = rawMsg.toLowerCase();
-    if (lower.includes('no gemini api key') || lower.includes('kein gemini api-key') || lower.includes('key_empty')) {
+    if (lower.includes('key_empty') || lower.includes('no api key') || lower.includes('kein api-key')) {
       res.status(400).json({ error: 'KEY_EMPTY' });
-    } else if (lower.includes('429') || lower.includes('resource_exhausted') || lower.includes('quota') || lower.includes('rate-limit') || lower.includes('rate limit')) {
-      res.status(429).json({ error: 'RATE_LIMIT' });
     } else {
       res.status(500).json({ error: 'GENERAL_ERROR' });
     }

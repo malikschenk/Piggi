@@ -1320,9 +1320,11 @@ function setAvatarSymbol(symbol: string) {
 const inputApiKey = document.getElementById('input-api-key') as HTMLInputElement | null;
 const btnSaveApiKey = document.getElementById('btn-save-api-key');
 if (btnSaveApiKey && inputApiKey) {
-    inputApiKey.value = localStorage.getItem('gemini_api_key') || '';
+    inputApiKey.value = localStorage.getItem('piggi_api_key') || localStorage.getItem('gemini_api_key') || '';
     const handleSaveApiKey = () => {
-        safeStorageSet('gemini_api_key', inputApiKey.value.trim());
+        const val = inputApiKey.value.trim();
+        safeStorageSet('piggi_api_key', val);
+        safeStorageSet('gemini_api_key', val);
         changeSlide('profile-slider', 0);
     };
     btnSaveApiKey.addEventListener('click', handleSaveApiKey);
@@ -1674,44 +1676,62 @@ function executeAction(act: any): string | null {
     return null;
 }
 
-async function callGeminiDirectly(userPrompt: string, rawKey: string) {
-    const apiKey = rawKey.trim().replace(/^['"]|['"]$/g, '');
-    const systemPrompt = `You are PiggiAI, the smart financial budgeting assistant inside the Piggi web app.
-Analyze the user's message (which may be in German, English, etc.) and respond with a helpful, friendly message and executable actions.
-Output MUST be a valid JSON object matching this schema:
-{
-  "reply": "Friendly response string summarizing actions or answering financial questions.",
-  "actions": [
-    { "action": "action_name", ...params }
-  ]
+function isHackClubKey(rawKey: string): boolean {
+    const k = rawKey.trim();
+    return k.startsWith('sk-hc-') || k.startsWith('hc-') || k.startsWith('sk-');
 }
 
-Supported Actions in the "actions" array:
-1. Balance:
-   - {"action": "set_balance", "amount": 500}
-   - {"action": "adjust_balance", "amount": -20}
-2. Monthly Income:
-   - {"action": "add_income", "name": "Salary", "amount": 2000}
-   - {"action": "edit_income", "name": "Salary", "amount": 2200}
-   - {"action": "delete_income", "name": "Salary"}
-3. Monthly Expenses:
-   - {"action": "add_expense", "name": "Rent", "amount": 800}
-   - {"action": "edit_expense", "name": "Rent", "amount": 850}
-   - {"action": "delete_expense", "name": "Rent"}
-4. Savings Goals:
-   - {"action": "add_goal", "name": "MacBook", "amount": 1200}
-   - {"action": "edit_goal", "name": "MacBook", "amount": 1400}
-   - {"action": "delete_goal", "name": "MacBook"}
-5. App Settings:
-   - {"action": "set_theme", "theme": "dark" | "light"}
-   - {"action": "change_avatar", "initial": "P"}
-   - {"action": "change_currency", "currency": "USD" | "EUR" | "JPY"}
+async function callHackClubAiDirectly(userPrompt: string, rawKey: string, systemPrompt: string) {
+    const apiKey = rawKey.trim().replace(/^['"]|['"]$/g, '');
+    const models = [
+        'openai/gpt-4o-mini',
+        'google/gemini-2.0-flash-001',
+        'meta-llama/llama-3.3-70b-instruct'
+    ];
+    let lastErr: any = null;
 
-CURRENT CONTEXT:
-${JSON.stringify(getFinancialContext(), null, 2)}
+    for (const model of models) {
+        try {
+            const res = await fetch('https://ai.hackclub.com/proxy/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    response_format: { type: 'json_object' }
+                })
+            });
 
-Provide only valid JSON. If no database action is needed, return empty actions array [].`;
+            if (res.ok) {
+                const data = await res.json();
+                const rawText = data.choices?.[0]?.message?.content?.trim() || '{}';
+                try {
+                    return JSON.parse(rawText);
+                } catch {
+                    const match = rawText.match(/\{[\s\S]*\}/);
+                    if (match) return JSON.parse(match[0]);
+                    return { reply: rawText, actions: [] };
+                }
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                const errMsg = errData?.error?.message || `API error ${res.status}`;
+                lastErr = new Error(errMsg);
+            }
+        } catch (e: any) {
+            lastErr = e;
+        }
+    }
+    throw lastErr || new Error('Failed to reach Hack Club AI');
+}
 
+async function callGeminiDirectlyWithPrompt(userPrompt: string, rawKey: string, systemPrompt: string) {
+    const apiKey = rawKey.trim().replace(/^['"]|['"]$/g, '');
     const models = [
         'gemini-3.8-flash',
         'gemini-3.1-flash-lite',
@@ -1755,6 +1775,67 @@ Provide only valid JSON. If no database action is needed, return empty actions a
     throw lastErr || new Error('Failed to reach Gemini model');
 }
 
+async function callAiDirectly(userPrompt: string, rawKey: string) {
+    const apiKey = rawKey.trim().replace(/^['"]|['"]$/g, '');
+    const systemPrompt = `You are PiggiAI, the smart financial budgeting assistant inside the Piggi web app.
+Analyze the user's message (which may be in German, English, etc.) and respond with a helpful, friendly message and executable actions.
+Output MUST be a valid JSON object matching this schema:
+{
+  "reply": "Friendly response string summarizing actions or answering financial questions.",
+  "actions": [
+    { "action": "action_name", ...params }
+  ]
+}
+
+Supported Actions in the "actions" array:
+1. Balance:
+   - {"action": "set_balance", "amount": 500}
+   - {"action": "adjust_balance", "amount": -20}
+2. Monthly Income:
+   - {"action": "add_income", "name": "Salary", "amount": 2000}
+   - {"action": "edit_income", "name": "Salary", "amount": 2200}
+   - {"action": "delete_income", "name": "Salary"}
+3. Monthly Expenses:
+   - {"action": "add_expense", "name": "Rent", "amount": 800}
+   - {"action": "edit_expense", "name": "Rent", "amount": 850}
+   - {"action": "delete_expense", "name": "Rent"}
+4. Savings Goals:
+   - {"action": "add_goal", "name": "MacBook", "amount": 1200}
+   - {"action": "edit_goal", "name": "MacBook", "amount": 1400}
+   - {"action": "delete_goal", "name": "MacBook"}
+5. App Settings:
+   - {"action": "set_theme", "theme": "dark" | "light"}
+   - {"action": "change_avatar", "initial": "P"}
+   - {"action": "change_currency", "currency": "USD" | "EUR" | "JPY"}
+
+CURRENT CONTEXT:
+${JSON.stringify(getFinancialContext(), null, 2)}
+
+Provide only valid JSON. If no database action is needed, return empty actions array [].`;
+
+    if (isHackClubKey(apiKey)) {
+        try {
+            return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
+        } catch (e) {
+            try {
+                return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
+            } catch {
+                throw e;
+            }
+        }
+    } else {
+        try {
+            return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
+        } catch (e) {
+            try {
+                return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
+            } catch {
+                throw e;
+            }
+        }
+    }
+}
+
 function formatAiErrorMessage(err: any): string {
     const raw = typeof err === 'string' ? err : (err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err || '')));
     const lower = raw.toLowerCase();
@@ -1762,29 +1843,17 @@ function formatAiErrorMessage(err: any): string {
     // 1. Case 1: API Key is empty / missing
     if (
         lower.includes('key_empty') ||
-        lower.includes('no gemini api key') ||
-        lower.includes('kein gemini api-key') ||
+        lower.includes('no api key') ||
         lower.includes('kein api-key') ||
+        lower.includes('kein api key') ||
         lower.includes('key is empty') ||
-        lower.includes('bitte trage deinen gemini api-key') ||
-        lower.includes('please enter your gemini api key')
+        lower.includes('please enter your api key') ||
+        lower.includes('bitte trage deinen api-key')
     ) {
-        return 'Please enter your Gemini API key in Settings > API Key to use PiggiAI.';
+        return 'Please enter your API key in Settings > API Key to use PiggiAI.';
     }
 
-    // 2. Case 2: Rate limit / Quota exceeded (HTTP 429)
-    if (
-        lower.includes('rate_limit') ||
-        lower.includes('resource_exhausted') ||
-        lower.includes('quota') ||
-        lower.includes('429') ||
-        lower.includes('rate-limit') ||
-        lower.includes('rate limit')
-    ) {
-        return 'Rate limit reached. Please wait a few moments or try another API key.';
-    }
-
-    // 3. Case 3: All other errors (wrong key, network, server)
+    // 2. Case 2: All other errors
     return 'Request failed. Please check your API key in Settings > API Key or try again later.';
 }
 
@@ -1845,7 +1914,7 @@ async function handleSendAiMessage() {
 
         showAiTyping();
 
-        const activeKey = localStorage.getItem('gemini_api_key') || '';
+        const activeKey = localStorage.getItem('piggi_api_key') || localStorage.getItem('gemini_api_key') || '';
         const financialCtx = getFinancialContext();
 
         let data: any = null;
@@ -1874,11 +1943,11 @@ async function handleSendAiMessage() {
         // Fallback with client key if proxy didn't succeed
         if (!responseSuccess) {
             if (activeKey && activeKey.trim().length > 0) {
-                data = await callGeminiDirectly(userPrompt, activeKey);
+                data = await callAiDirectly(userPrompt, activeKey);
                 responseSuccess = true;
             } else {
                 removeAiTyping();
-                addChatMessage('ai', 'Please enter your Gemini API key in Settings > API Key to use PiggiAI.', [], true);
+                addChatMessage('ai', 'Please enter your API key in Settings > API Key to use PiggiAI.', [], true);
                 return;
             }
         }
