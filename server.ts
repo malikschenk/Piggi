@@ -8,15 +8,22 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const isHackClubKey = (key: string): boolean => {
-  const k = key.trim();
-  return k.startsWith('sk-hc-') || k.startsWith('hc-') || k.startsWith('sk-');
+const cleanApiKey = (raw: any): string => {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/^Bearer\s+/i, '')
+    .trim();
+};
+
+const isGeminiKey = (key: string): boolean => {
+  return key.startsWith('AIza');
 };
 
 const getAiClient = (customKey?: string) => {
-  let rawKey = (customKey && customKey.trim().length > 0) ? customKey.trim() : '';
-  rawKey = rawKey.replace(/^['"]|['"]$/g, '').trim();
-  if (!rawKey || isHackClubKey(rawKey)) return null;
+  const rawKey = cleanApiKey(customKey);
+  if (!rawKey || !isGeminiKey(rawKey)) return null;
   return new GoogleGenAI({
     apiKey: rawKey,
   });
@@ -30,9 +37,7 @@ app.post('/api/chat', async (req, res) => {
       return;
     }
 
-    const effectiveKey = (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 0)
-      ? apiKey.trim().replace(/^['"]|['"]$/g, '')
-      : (process.env.GEMINI_API_KEY || process.env.API_KEY || '').trim();
+    const effectiveKey = cleanApiKey(apiKey);
 
     if (!effectiveKey) {
       res.status(400).json({
@@ -88,11 +93,12 @@ Output ONLY valid JSON.`;
     let lastError: any = null;
     let textResponse: string | null = null;
 
-    if (isHackClubKey(effectiveKey)) {
+    const runHackClub = async (key: string): Promise<string | null> => {
       const hcModels = [
         'openai/gpt-4o-mini',
-        'google/gemini-2.0-flash-001',
         'meta-llama/llama-3.3-70b-instruct',
+        'google/gemini-2.5-flash',
+        'openai/gpt-3.5-turbo',
       ];
       for (const model of hcModels) {
         try {
@@ -100,7 +106,7 @@ Output ONLY valid JSON.`;
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${effectiveKey}`,
+              'Authorization': `Bearer ${key}`,
             },
             body: JSON.stringify({
               model,
@@ -108,26 +114,27 @@ Output ONLY valid JSON.`;
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: message },
               ],
-              response_format: { type: 'json_object' },
             }),
           });
           if (hcRes.ok) {
             const hcData: any = await hcRes.json();
             const text = hcData.choices?.[0]?.message?.content?.trim();
-            if (text) {
-              textResponse = text;
-              break;
-            }
+            if (text) return text;
           } else {
             const errBody = await hcRes.text();
-            lastError = new Error(`Hack Club AI error: ${errBody}`);
+            console.error(`[Hack Club error] model: ${model}, status: ${hcRes.status}, body: ${errBody}`);
+            lastError = new Error(`Hack Club AI error ${hcRes.status}: ${errBody}`);
           }
         } catch (err: any) {
+          console.error(`[Hack Club fetch error] model: ${model}:`, err?.message || err);
           lastError = err;
         }
       }
-    } else {
-      const ai = getAiClient(effectiveKey);
+      return null;
+    };
+
+    const runGemini = async (key: string): Promise<string | null> => {
+      const ai = getAiClient(key);
       const modelsToTry = [
         'gemini-3.8-flash',
         'gemini-3.1-flash-lite',
@@ -145,43 +152,49 @@ Output ONLY valid JSON.`;
                 responseMimeType: 'application/json',
               },
             });
-            if (res?.text) {
-              textResponse = res.text;
-              break;
-            }
+            if (res?.text) return res.text;
           } catch (err: any) {
             lastError = err;
           }
         }
       }
 
-      if (!textResponse) {
-        for (const model of modelsToTry) {
-          try {
-            const restRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${effectiveKey}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                systemInstruction: { parts: [{ text: systemPrompt }] },
-                contents: [{ parts: [{ text: message }] }],
-                generationConfig: { responseMimeType: 'application/json' },
-              }),
-            });
-            if (restRes.ok) {
-              const data: any = await restRes.json();
-              const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (textOutput) {
-                textResponse = textOutput;
-                break;
-              }
-            } else {
-              const errBody = await restRes.text();
-              lastError = new Error(`Gemini REST error: ${errBody}`);
-            }
-          } catch (err: any) {
-            lastError = err;
+      for (const model of modelsToTry) {
+        try {
+          const restRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              contents: [{ parts: [{ text: message }] }],
+              generationConfig: { responseMimeType: 'application/json' },
+            }),
+          });
+          if (restRes.ok) {
+            const data: any = await restRes.json();
+            const textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (textOutput) return textOutput;
+          } else {
+            const errBody = await restRes.text();
+            lastError = new Error(`Gemini REST error: ${errBody}`);
           }
+        } catch (err: any) {
+          lastError = err;
         }
+      }
+      return null;
+    };
+
+    // Auto-detect provider with mutual fallback
+    if (isGeminiKey(effectiveKey)) {
+      textResponse = await runGemini(effectiveKey);
+      if (!textResponse) {
+        textResponse = await runHackClub(effectiveKey);
+      }
+    } else {
+      textResponse = await runHackClub(effectiveKey);
+      if (!textResponse) {
+        textResponse = await runGemini(effectiveKey);
       }
     }
 

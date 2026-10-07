@@ -438,6 +438,18 @@ function renderBalanceHistory() {
     });
 }
 
+function addBalanceActivity(type: 'add' | 'subtract' | 'set', amount: number) {
+    balanceHistory.unshift({
+        id: Date.now().toString(),
+        type,
+        amount: Math.abs(roundCurrency(amount)),
+        date: new Date().toISOString()
+    });
+    balanceHistory = balanceHistory.slice(0, 5);
+    safeStorageSet('piggi_balance_history', JSON.stringify(balanceHistory));
+    renderBalanceHistory();
+}
+
 // UI Renderers
 function updateBalanceUI() {
     const formatted = formatCurrency(currentBalance);
@@ -960,35 +972,17 @@ function handleSaveBalance() {
     if (!isNaN(val)) {
         if (editingBalanceMode === 'add') {
             currentBalance += val;
-            balanceHistory.unshift({
-                id: Date.now().toString(),
-                type: 'add',
-                amount: val,
-                date: new Date().toISOString()
-            });
+            addBalanceActivity('add', val);
         } else if (editingBalanceMode === 'subtract') {
             currentBalance -= val;
-            balanceHistory.unshift({
-                id: Date.now().toString(),
-                type: 'subtract',
-                amount: val,
-                date: new Date().toISOString()
-            });
+            addBalanceActivity('subtract', val);
         } else {
             currentBalance = val;
-            balanceHistory.unshift({
-                id: Date.now().toString(),
-                type: 'set',
-                amount: val,
-                date: new Date().toISOString()
-            });
+            addBalanceActivity('set', val);
         }
         // Limit balance to 6 digits [-999999, +999999]
         currentBalance = Math.max(-999999, Math.min(999999, currentBalance));
-        balanceHistory = balanceHistory.slice(0, 5);
-        localStorage.setItem('piggi_balance_history', JSON.stringify(balanceHistory));
         updateBalanceUI();
-        renderBalanceHistory();
     }
     inputBalance.value = '';
     clearValidation(inputBalance, errorBalance);
@@ -1320,9 +1314,10 @@ function setAvatarSymbol(symbol: string) {
 const inputApiKey = document.getElementById('input-api-key') as HTMLInputElement | null;
 const btnSaveApiKey = document.getElementById('btn-save-api-key');
 if (btnSaveApiKey && inputApiKey) {
-    inputApiKey.value = localStorage.getItem('piggi_api_key') || localStorage.getItem('gemini_api_key') || '';
+    inputApiKey.value = cleanApiKey(localStorage.getItem('piggi_api_key') || localStorage.getItem('gemini_api_key') || '');
     const handleSaveApiKey = () => {
-        const val = inputApiKey.value.trim();
+        const val = cleanApiKey(inputApiKey.value);
+        inputApiKey.value = val;
         safeStorageSet('piggi_api_key', val);
         safeStorageSet('gemini_api_key', val);
         changeSlide('profile-slider', 0);
@@ -1526,6 +1521,7 @@ function executeAction(act: any): string | null {
         case 'set_balance':
             if (typeof act.amount === 'number') {
                 currentBalance = Math.max(-999999, Math.min(999999, roundCurrency(act.amount)));
+                addBalanceActivity('set', currentBalance);
                 updateBalanceUI();
                 return `✓ Balance set to ${formatCurrency(currentBalance)}`;
             }
@@ -1533,11 +1529,13 @@ function executeAction(act: any): string | null {
 
         case 'adjust_balance':
             if (typeof act.amount === 'number') {
-                currentBalance = roundCurrency(currentBalance + act.amount);
+                const change = roundCurrency(act.amount);
+                currentBalance = roundCurrency(currentBalance + change);
                 currentBalance = Math.max(-999999, Math.min(999999, currentBalance));
+                addBalanceActivity(change >= 0 ? 'add' : 'subtract', change);
                 updateBalanceUI();
-                const sign = act.amount >= 0 ? '+' : '';
-                return `✓ Balance adjusted: ${sign}${formatCurrency(act.amount)}`;
+                const sign = change >= 0 ? '+' : '';
+                return `✓ Balance adjusted: ${sign}${formatCurrency(change)}`;
             }
             break;
 
@@ -1676,62 +1674,77 @@ function executeAction(act: any): string | null {
     return null;
 }
 
-function isHackClubKey(rawKey: string): boolean {
-    const k = rawKey.trim();
-    return k.startsWith('sk-hc-') || k.startsWith('hc-') || k.startsWith('sk-');
+function cleanApiKey(raw: any): string {
+    if (!raw || typeof raw !== 'string') return '';
+    return raw
+        .trim()
+        .replace(/^['"]|['"]$/g, '')
+        .replace(/^Bearer\s+/i, '')
+        .trim();
+}
+
+function isGeminiKey(rawKey: string): boolean {
+    return cleanApiKey(rawKey).startsWith('AIza');
 }
 
 async function callHackClubAiDirectly(userPrompt: string, rawKey: string, systemPrompt: string) {
-    const apiKey = rawKey.trim().replace(/^['"]|['"]$/g, '');
+    const apiKey = cleanApiKey(rawKey);
     const models = [
         'openai/gpt-4o-mini',
-        'google/gemini-2.0-flash-001',
-        'meta-llama/llama-3.3-70b-instruct'
+        'meta-llama/llama-3.3-70b-instruct',
+        'google/gemini-2.5-flash',
+        'openai/gpt-3.5-turbo'
     ];
     let lastErr: any = null;
 
-    for (const model of models) {
-        try {
-            const res = await fetch('https://ai.hackclub.com/proxy/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                    model,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt }
-                    ],
-                    response_format: { type: 'json_object' }
-                })
-            });
+    const endpoints = [
+        'https://ai.hackclub.com/proxy/v1/chat/completions',
+        'https://corsproxy.io/?url=' + encodeURIComponent('https://ai.hackclub.com/proxy/v1/chat/completions')
+    ];
 
-            if (res.ok) {
-                const data = await res.json();
-                const rawText = data.choices?.[0]?.message?.content?.trim() || '{}';
-                try {
-                    return JSON.parse(rawText);
-                } catch {
-                    const match = rawText.match(/\{[\s\S]*\}/);
-                    if (match) return JSON.parse(match[0]);
-                    return { reply: rawText, actions: [] };
+    for (const model of models) {
+        for (const url of endpoints) {
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model,
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: userPrompt }
+                        ]
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const rawText = data.choices?.[0]?.message?.content?.trim() || '{}';
+                    try {
+                        return JSON.parse(rawText);
+                    } catch {
+                        const match = rawText.match(/\{[\s\S]*\}/);
+                        if (match) return JSON.parse(match[0]);
+                        return { reply: rawText, actions: [] };
+                    }
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    const errMsg = errData?.error?.message || errData?.error || `API error ${res.status}`;
+                    lastErr = new Error(errMsg);
                 }
-            } else {
-                const errData = await res.json().catch(() => ({}));
-                const errMsg = errData?.error?.message || `API error ${res.status}`;
-                lastErr = new Error(errMsg);
+            } catch (e: any) {
+                lastErr = e;
             }
-        } catch (e: any) {
-            lastErr = e;
         }
     }
     throw lastErr || new Error('Failed to reach Hack Club AI');
 }
 
 async function callGeminiDirectlyWithPrompt(userPrompt: string, rawKey: string, systemPrompt: string) {
-    const apiKey = rawKey.trim().replace(/^['"]|['"]$/g, '');
+    const apiKey = cleanApiKey(rawKey);
     const models = [
         'gemini-3.8-flash',
         'gemini-3.1-flash-lite',
@@ -1776,7 +1789,7 @@ async function callGeminiDirectlyWithPrompt(userPrompt: string, rawKey: string, 
 }
 
 async function callAiDirectly(userPrompt: string, rawKey: string) {
-    const apiKey = rawKey.trim().replace(/^['"]|['"]$/g, '');
+    const apiKey = cleanApiKey(rawKey);
     const systemPrompt = `You are PiggiAI, the smart financial budgeting assistant inside the Piggi web app.
 Analyze the user's message (which may be in German, English, etc.) and respond with a helpful, friendly message and executable actions.
 Output MUST be a valid JSON object matching this schema:
@@ -1813,22 +1826,22 @@ ${JSON.stringify(getFinancialContext(), null, 2)}
 
 Provide only valid JSON. If no database action is needed, return empty actions array [].`;
 
-    if (isHackClubKey(apiKey)) {
+    if (isGeminiKey(apiKey)) {
         try {
-            return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
+            return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
         } catch (e) {
             try {
-                return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
+                return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
             } catch {
                 throw e;
             }
         }
     } else {
         try {
-            return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
+            return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
         } catch (e) {
             try {
-                return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
+                return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
             } catch {
                 throw e;
             }
@@ -1914,7 +1927,13 @@ async function handleSendAiMessage() {
 
         showAiTyping();
 
-        const activeKey = localStorage.getItem('piggi_api_key') || localStorage.getItem('gemini_api_key') || '';
+        const activeKey = (localStorage.getItem('piggi_api_key') || localStorage.getItem('gemini_api_key') || '').trim();
+        if (!activeKey) {
+            removeAiTyping();
+            addChatMessage('ai', 'Please enter your API key in Settings > API Key to use PiggiAI.', [], true);
+            return;
+        }
+
         const financialCtx = getFinancialContext();
 
         let data: any = null;
@@ -1942,14 +1961,8 @@ async function handleSendAiMessage() {
 
         // Fallback with client key if proxy didn't succeed
         if (!responseSuccess) {
-            if (activeKey && activeKey.trim().length > 0) {
-                data = await callAiDirectly(userPrompt, activeKey);
-                responseSuccess = true;
-            } else {
-                removeAiTyping();
-                addChatMessage('ai', 'Please enter your API key in Settings > API Key to use PiggiAI.', [], true);
-                return;
-            }
+            data = await callAiDirectly(userPrompt, activeKey);
+            responseSuccess = true;
         }
 
         removeAiTyping();
@@ -1963,6 +1976,7 @@ async function handleSendAiMessage() {
             });
             // Update all views after actions
             updateBalanceUI();
+            renderBalanceHistory();
             renderStats();
             renderCalculator();
         }
