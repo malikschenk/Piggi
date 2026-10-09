@@ -5,7 +5,7 @@ This project is also documented on [Hack Club Stardance](https://stardance.hackc
 
 ## Live Demo
 
-**Check Piggi out [here](https://malikschenk.github.io/Piggi/)!**
+**Check Piggi out [here](https://piggi-app.vercel.app/)!**
 
 ## Features 
 
@@ -31,5 +31,5 @@ You can reset and delete all your data with just two clicks (Settings > Reset Da
 
 ## How it works
 
-I used Google AI Studio to create this app, it's a useful tool! The app is built with Vite, React, TypeScript and Tailwind CSS. <br>
+I used Google AI Studio to create this app, it's a useful tool! The app is built with Vite, React, TypeScript and Tailwind CSS.
 PiggiAI takes your prompt and creates a JSON with Gemini to use the features and to give you a helpful answer.
