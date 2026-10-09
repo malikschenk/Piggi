@@ -84,11 +84,15 @@ function updateCurrencyCheckmarks() {
 }
 function setCurrency(curr) {
   currentCurrency = curr;
-  localStorage.setItem("piggi_currency", curr);
+  safeStorageSet("piggi_currency", curr);
   updateCurrencyCheckmarks();
   updateBalanceUI();
   renderIncome();
   renderExpenses();
+  renderGoals();
+  renderStats();
+  renderCalculator();
+  renderBalanceHistory();
 }
 const btnCurrUsd = document.getElementById("btn-currency-usd");
 const btnCurrEur = document.getElementById("btn-currency-eur");
@@ -620,6 +624,7 @@ const calcPreview6m = document.getElementById("calc-preview-6m");
 const calcPreview1y = document.getElementById("calc-preview-1y");
 function initCalculator() {
   if (!calculatorDateInput) return;
+  calculatorDateInput.min = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
   if (!calculatorDateInput.value) {
     const defaultDate = /* @__PURE__ */ new Date();
     defaultDate.setDate(defaultDate.getDate() + 90);
@@ -1126,6 +1131,12 @@ if (btnConfirmReset) {
     renderGoals();
     renderIncome();
     renderExpenses();
+    renderBalanceHistory();
+    renderStats();
+    renderCalculator();
+    if (aiChatHistory) {
+      aiChatHistory.innerHTML = '<div id="ai-initial-greeting" class="ai-greeting-text">Hello! How can I help you today?</div>';
+    }
     changeSlide("profile-slider", 0);
     closeModal(document.getElementById("profile-modal"));
   });
@@ -1303,9 +1314,12 @@ function executeAction(act) {
     case "delete_income": {
       const name = sanitizeName(act.name);
       if (name) {
+        const prevCount = incomeSources.length;
         incomeSources = incomeSources.filter((i) => i.name.toLowerCase() !== name.toLowerCase());
-        renderIncome();
-        return `\u2713 Deleted income: ${name}`;
+        if (incomeSources.length < prevCount) {
+          renderIncome();
+          return `\u2713 Deleted income: ${name}`;
+        }
       }
       break;
     }
@@ -1337,9 +1351,12 @@ function executeAction(act) {
     case "delete_expense": {
       const name = sanitizeName(act.name);
       if (name) {
+        const prevCount = expenseSources.length;
         expenseSources = expenseSources.filter((e) => e.name.toLowerCase() !== name.toLowerCase());
-        renderExpenses();
-        return `\u2713 Deleted expense: ${name}`;
+        if (expenseSources.length < prevCount) {
+          renderExpenses();
+          return `\u2713 Deleted expense: ${name}`;
+        }
       }
       break;
     }
@@ -1371,9 +1388,12 @@ function executeAction(act) {
     case "delete_goal": {
       const name = sanitizeName(act.name);
       if (name) {
+        const prevCount = savingGoals.length;
         savingGoals = savingGoals.filter((g) => g.name.toLowerCase() !== name.toLowerCase());
-        renderGoals();
-        return `\u2713 Deleted savings goal: ${name}`;
+        if (savingGoals.length < prevCount) {
+          renderGoals();
+          return `\u2713 Deleted savings goal: ${name}`;
+        }
       }
       break;
     }
@@ -1409,9 +1429,10 @@ async function callHackClubAiDirectly(userPrompt, rawKey, systemPrompt) {
   const apiKey = cleanApiKey(rawKey);
   const models = [
     "openai/gpt-4o-mini",
+    "anthropic/claude-3.5-sonnet",
+    "qwen/qwen3-32b",
     "meta-llama/llama-3.3-70b-instruct",
-    "google/gemini-2.5-flash",
-    "openai/gpt-3.5-turbo"
+    "google/gemini-2.0-flash-001"
   ];
   let lastErr = null;
   const endpoints = [

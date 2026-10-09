@@ -111,11 +111,15 @@ function updateCurrencyCheckmarks() {
 
 function setCurrency(curr: CurrencyCode) {
     currentCurrency = curr;
-    localStorage.setItem('piggi_currency', curr);
+    safeStorageSet('piggi_currency', curr);
     updateCurrencyCheckmarks();
     updateBalanceUI();
     renderIncome();
     renderExpenses();
+    renderGoals();
+    renderStats();
+    renderCalculator();
+    renderBalanceHistory();
 }
 
 // Currency option buttons
@@ -750,6 +754,9 @@ const calcPreview1y = document.getElementById('calc-preview-1y');
 function initCalculator() {
     if (!calculatorDateInput) return;
     
+    // Prevent selecting dates in the past
+    calculatorDateInput.min = new Date().toISOString().split('T')[0];
+
     // Set default date to +3 months from today if not set
     if (!calculatorDateInput.value) {
         const defaultDate = new Date();
@@ -1355,6 +1362,13 @@ if (btnConfirmReset) {
         renderGoals();
         renderIncome();
         renderExpenses();
+        renderBalanceHistory();
+        renderStats();
+        renderCalculator();
+
+        if (aiChatHistory) {
+            aiChatHistory.innerHTML = '<div id="ai-initial-greeting" class="ai-greeting-text">Hello! How can I help you today?</div>';
+        }
 
         changeSlide('profile-slider', 0);
         closeModal(document.getElementById('profile-modal'));
@@ -1569,9 +1583,12 @@ function executeAction(act: any): string | null {
         case 'delete_income': {
             const name = sanitizeName(act.name);
             if (name) {
+                const prevCount = incomeSources.length;
                 incomeSources = incomeSources.filter(i => i.name.toLowerCase() !== name.toLowerCase());
-                renderIncome();
-                return `✓ Deleted income: ${name}`;
+                if (incomeSources.length < prevCount) {
+                    renderIncome();
+                    return `✓ Deleted income: ${name}`;
+                }
             }
             break;
         }
@@ -1606,9 +1623,12 @@ function executeAction(act: any): string | null {
         case 'delete_expense': {
             const name = sanitizeName(act.name);
             if (name) {
+                const prevCount = expenseSources.length;
                 expenseSources = expenseSources.filter(e => e.name.toLowerCase() !== name.toLowerCase());
-                renderExpenses();
-                return `✓ Deleted expense: ${name}`;
+                if (expenseSources.length < prevCount) {
+                    renderExpenses();
+                    return `✓ Deleted expense: ${name}`;
+                }
             }
             break;
         }
@@ -1643,9 +1663,12 @@ function executeAction(act: any): string | null {
         case 'delete_goal': {
             const name = sanitizeName(act.name);
             if (name) {
+                const prevCount = savingGoals.length;
                 savingGoals = savingGoals.filter(g => g.name.toLowerCase() !== name.toLowerCase());
-                renderGoals();
-                return `✓ Deleted savings goal: ${name}`;
+                if (savingGoals.length < prevCount) {
+                    renderGoals();
+                    return `✓ Deleted savings goal: ${name}`;
+                }
             }
             break;
         }
@@ -1691,9 +1714,10 @@ async function callHackClubAiDirectly(userPrompt: string, rawKey: string, system
     const apiKey = cleanApiKey(rawKey);
     const models = [
         'openai/gpt-4o-mini',
+        'anthropic/claude-3.5-sonnet',
+        'qwen/qwen3-32b',
         'meta-llama/llama-3.3-70b-instruct',
-        'google/gemini-2.5-flash',
-        'openai/gpt-3.5-turbo'
+        'google/gemini-2.0-flash-001'
     ];
     let lastErr: any = null;
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
+import OpenAI from 'openai';
 import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
@@ -94,39 +95,32 @@ Output ONLY valid JSON.`;
     let textResponse: string | null = null;
 
     const runHackClub = async (key: string): Promise<string | null> => {
+      const client = new OpenAI({
+        baseURL: 'https://ai.hackclub.com/proxy/v1',
+        apiKey: key,
+      });
+
       const hcModels = [
         'openai/gpt-4o-mini',
+        'anthropic/claude-3.5-sonnet',
+        'qwen/qwen3-32b',
         'meta-llama/llama-3.3-70b-instruct',
-        'google/gemini-2.5-flash',
-        'openai/gpt-3.5-turbo',
+        'google/gemini-2.0-flash-001',
       ];
+
       for (const model of hcModels) {
         try {
-          const hcRes = await fetch('https://ai.hackclub.com/proxy/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${key}`,
-            },
-            body: JSON.stringify({
-              model,
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: message },
-              ],
-            }),
+          const completion = await client.chat.completions.create({
+            model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: message },
+            ],
           });
-          if (hcRes.ok) {
-            const hcData: any = await hcRes.json();
-            const text = hcData.choices?.[0]?.message?.content?.trim();
-            if (text) return text;
-          } else {
-            const errBody = await hcRes.text();
-            console.error(`[Hack Club error] model: ${model}, status: ${hcRes.status}, body: ${errBody}`);
-            lastError = new Error(`Hack Club AI error ${hcRes.status}: ${errBody}`);
-          }
+          const text = completion.choices?.[0]?.message?.content?.trim();
+          if (text) return text;
         } catch (err: any) {
-          console.error(`[Hack Club fetch error] model: ${model}:`, err?.message || err);
+          console.error(`[Hack Club error] model: ${model}, status: ${err?.status}, message: ${err?.message}`);
           lastError = err;
         }
       }
@@ -185,7 +179,6 @@ Output ONLY valid JSON.`;
       return null;
     };
 
-    // Auto-detect provider with mutual fallback
     if (isGeminiKey(effectiveKey)) {
       textResponse = await runGemini(effectiveKey);
       if (!textResponse) {
