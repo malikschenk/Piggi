@@ -1435,45 +1435,39 @@ async function callHackClubAiDirectly(userPrompt, rawKey, systemPrompt) {
     "google/gemini-2.0-flash-001"
   ];
   let lastErr = null;
-  const endpoints = [
-    "https://ai.hackclub.com/proxy/v1/chat/completions",
-    "https://corsproxy.io/?url=" + encodeURIComponent("https://ai.hackclub.com/proxy/v1/chat/completions")
-  ];
   for (const model of models) {
-    for (const url of endpoints) {
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt }
-            ]
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const rawText = data.choices?.[0]?.message?.content?.trim() || "{}";
-          try {
-            return JSON.parse(rawText);
-          } catch {
-            const match = rawText.match(/\{[\s\S]*\}/);
-            if (match) return JSON.parse(match[0]);
-            return { reply: rawText, actions: [] };
-          }
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          const errMsg = errData?.error?.message || errData?.error || `API error ${res.status}`;
-          lastErr = new Error(errMsg);
+    try {
+      const res = await fetch("https://ai.hackclub.com/proxy/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ]
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const rawText = data.choices?.[0]?.message?.content?.trim() || "{}";
+        try {
+          return JSON.parse(rawText);
+        } catch {
+          const match = rawText.match(/\{[\s\S]*\}/);
+          if (match) return JSON.parse(match[0]);
+          return { reply: rawText, actions: [] };
         }
-      } catch (e) {
-        lastErr = e;
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData?.error?.message || errData?.error || `API error ${res.status}`;
+        lastErr = new Error(errMsg);
       }
+    } catch (e) {
+      lastErr = e;
     }
   }
   throw lastErr || new Error("Failed to reach Hack Club AI");
@@ -1558,25 +1552,9 @@ ${JSON.stringify(getFinancialContext(), null, 2)}
 
 Provide only valid JSON. If no database action is needed, return empty actions array [].`;
   if (isGeminiKey(apiKey)) {
-    try {
-      return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
-    } catch (e) {
-      try {
-        return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
-      } catch {
-        throw e;
-      }
-    }
+    return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
   } else {
-    try {
-      return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
-    } catch (e) {
-      try {
-        return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
-      } catch {
-        throw e;
-      }
-    }
+    return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
   }
 }
 function formatAiErrorMessage(err) {
@@ -1584,6 +1562,12 @@ function formatAiErrorMessage(err) {
   const lower = raw.toLowerCase();
   if (lower.includes("key_empty") || lower.includes("no api key") || lower.includes("kein api-key") || lower.includes("kein api key") || lower.includes("key is empty") || lower.includes("please enter your api key") || lower.includes("bitte trage deinen api-key")) {
     return "Please enter your API key in Settings > API Key to use PiggiAI.";
+  }
+  if (lower.includes("cors") || lower.includes("failed to fetch") || lower.includes("networkerror")) {
+    if (window.location.hostname.includes("github.io")) {
+      return "CORS-Fehler: GitHub Pages ist ein rein statischer Host ohne Node.js-Backend. Die Hack Club API erlaubt aus Sicherheitsgr\xFCnden keine direkten Browser-Aufrufe (CORS). Nutze entweder einen kostenlosen Google Gemini Key (funktioniert direkt auf GitHub Pages) oder hoste die App mit Backend auf Vercel oder Render.";
+    }
+    return "CORS/Netzwerkfehler: Hack Club AI blockiert direkte Browser-Anfragen. Bitte nutze einen Google Gemini API-Key oder starte die App mit Backend.";
   }
   return "Request failed. Please check your API key in Settings > API Key or try again later.";
 }

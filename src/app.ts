@@ -1,11 +1,9 @@
-// Piggi - Personal Finance & AI Budgeting
 
 type Goal = { name: string; amount: number };
 type IncomeSource = { name: string; amount: number };
 type ExpenseSource = { name: string; amount: number };
 type CurrencyCode = 'USD' | 'EUR' | 'JPY';
 
-// Helper for safe storage access
 function safeStorageSet(key: string, value: string) {
     try {
         localStorage.setItem(key, value);
@@ -14,12 +12,10 @@ function safeStorageSet(key: string, value: string) {
     }
 }
 
-// Helper for accurate financial rounding (2 decimals)
 function roundCurrency(amount: number): number {
     return Math.round((amount + Number.EPSILON) * 100) / 100;
 }
 
-// State variables
 let currentBalance = roundCurrency(parseFloat(localStorage.getItem('piggi_balance') || '0.00'));
 if (isNaN(currentBalance)) currentBalance = 0.00;
 
@@ -55,7 +51,6 @@ if (!['USD', 'EUR', 'JPY'].includes(currentCurrency)) {
     currentCurrency = 'EUR';
 }
 
-// Elements
 const profileTrigger = document.getElementById('profile-trigger');
 if (profileTrigger) profileTrigger.textContent = avatarSymbol;
 
@@ -82,7 +77,6 @@ const aiChatHistory = document.getElementById('ai-chat-history');
 const editIconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`;
 const deleteIconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
 
-// Currency formatting
 function formatCurrency(amount: number): string {
     const isJpy = currentCurrency === 'JPY';
     const locale = currentCurrency === 'EUR' ? 'de-DE' : currentCurrency === 'JPY' ? 'ja-JP' : 'en-US';
@@ -122,7 +116,6 @@ function setCurrency(curr: CurrencyCode) {
     renderBalanceHistory();
 }
 
-// Currency option buttons
 const btnCurrUsd = document.getElementById('btn-currency-usd');
 const btnCurrEur = document.getElementById('btn-currency-eur');
 const btnCurrJpy = document.getElementById('btn-currency-jpy');
@@ -131,7 +124,6 @@ if (btnCurrUsd) btnCurrUsd.addEventListener('click', () => setCurrency('USD'));
 if (btnCurrEur) btnCurrEur.addEventListener('click', () => setCurrency('EUR'));
 if (btnCurrJpy) btnCurrJpy.addEventListener('click', () => setCurrency('JPY'));
 
-// Modals management
 const cards: Record<string, HTMLElement | null> = {
     'balance-card': document.getElementById('balance-modal'),
     'goals-card': document.getElementById('goals-modal'),
@@ -185,7 +177,6 @@ allOverlays.forEach(overlayNode => {
             const touch = e.touches[0];
             const target = e.target as HTMLElement;
 
-            // Don't drag if touching input, textarea, button or scrollable list that is scrolled down
             if (target.closest('input, textarea, button, .icon-btn-edit, .icon-btn-delete')) {
                 canDrag = false;
                 return;
@@ -197,7 +188,6 @@ allOverlays.forEach(overlayNode => {
                 return;
             }
 
-            // Allow dragging from handle, header, or top 140px of sheet
             const sheetRect = sheet.getBoundingClientRect();
             const touchRelativeY = touch.clientY - sheetRect.top;
             if (target.closest('.drag-handle-container, .sheet-header') || touchRelativeY <= 140) {
@@ -243,7 +233,6 @@ allOverlays.forEach(overlayNode => {
     }
 });
 
-// Card click handlers
 Object.keys(cards).forEach(id => {
     const trigger = document.getElementById(id);
     if (trigger) {
@@ -256,7 +245,6 @@ Object.keys(cards).forEach(id => {
     }
 });
 
-// Modal close buttons
 const overlayClosers = [
     { btn: 'btn-close-balance', modal: 'balance-modal' },
     { btn: 'btn-close-goals', modal: 'goals-modal' },
@@ -280,7 +268,6 @@ overlayClosers.forEach(c => {
     }
 });
 
-// Input validation helper
 function isValidNumber(value: string): boolean {
     if (!value || value.trim() === '') return false;
     const cleanValue = value.replace(',', '.').trim();
@@ -297,7 +284,6 @@ function enforceSixDigits(inputEl: HTMLInputElement, allowNegative: boolean = fa
         val = val.slice(1);
     }
 
-    // Split by decimal separator (, or .)
     const hasDecimal = val.includes('.') || val.includes(',');
     let separator = '.';
     if (val.includes(',')) separator = ',';
@@ -381,7 +367,6 @@ const inputExpenseAmount = document.getElementById('input-expense-amount') as HT
 const errorExpenseAmount = document.getElementById('error-expense-amount');
 if (inputExpenseAmount) inputExpenseAmount.addEventListener('input', () => validateNumberInput(inputExpenseAmount, errorExpenseAmount, 999999, false));
 
-// Balance Activity History
 interface BalanceActivity {
     id: string;
     type: 'add' | 'subtract' | 'set';
@@ -454,7 +439,6 @@ function addBalanceActivity(type: 'add' | 'subtract' | 'set', amount: number) {
     renderBalanceHistory();
 }
 
-// UI Renderers
 function updateBalanceUI() {
     const formatted = formatCurrency(currentBalance);
     if (mainBalanceValue) {
@@ -629,7 +613,6 @@ function renderExpenses() {
     renderCalculator();
 }
 
-// Stats Renderer (Minimalist: Monthly Net, Savings Rate, Goals Forecast & Leftover Money)
 const statsTrendBadge = document.getElementById('stats-trend-badge');
 const statsRateBadge = document.getElementById('stats-rate-badge');
 const statsModalNet = document.getElementById('stats-modal-net');
@@ -646,7 +629,6 @@ function renderStats() {
         savingsRate = Math.round((monthlyNet / totalIncome) * 100);
     }
 
-    // Main Card Trend Badge & Savings Rate (neutral text color)
     if (statsTrendBadge) {
         const sign = monthlyNet > 0 ? '+' : '';
         statsTrendBadge.textContent = `${sign}${formatCurrency(monthlyNet)}`;
@@ -658,7 +640,6 @@ function renderStats() {
         statsRateBadge.classList.remove('price-green', 'price-red');
     }
 
-    // Modal Summary Bar (neutral text color)
     if (statsModalNet) {
         const sign = monthlyNet > 0 ? '+' : '';
         statsModalNet.textContent = `${sign}${formatCurrency(monthlyNet)}`;
@@ -669,7 +650,6 @@ function renderStats() {
         statsModalSavingsRate.textContent = `${savingsRate}%`;
     }
 
-    // Modal Goals Forecast
     if (statsGoalsForecastList) {
         statsGoalsForecastList.innerHTML = '';
         if (savingGoals.length === 0) {
@@ -744,7 +724,6 @@ function renderStats() {
     }
 }
 
-// Calculator Logic
 const calculatorDateInput = document.getElementById('calculator-date-input') as HTMLInputElement | null;
 const calcBalanceWithoutGoals = document.getElementById('calc-balance-without-goals');
 const calcGoalsList = document.getElementById('calc-goals-list');
@@ -754,10 +733,8 @@ const calcPreview1y = document.getElementById('calc-preview-1y');
 function initCalculator() {
     if (!calculatorDateInput) return;
     
-    // Prevent selecting dates in the past
     calculatorDateInput.min = new Date().toISOString().split('T')[0];
 
-    // Set default date to +3 months from today if not set
     if (!calculatorDateInput.value) {
         const defaultDate = new Date();
         defaultDate.setDate(defaultDate.getDate() + 90);
@@ -787,7 +764,6 @@ function renderCalculator() {
     const totalExpense = expenseSources.reduce((sum, e) => sum + e.amount, 0);
     const monthlyNet = totalIncome - totalExpense;
 
-    // Update main dashboard Calculator card preview (6 Months & 1 Year) - neutral text color
     const proj6m = currentBalance + (180 * (monthlyNet * 12 / 365));
     const proj1y = currentBalance + (365 * (monthlyNet * 12 / 365));
 
@@ -825,11 +801,9 @@ function renderCalculator() {
         projectedBalance += daysDiff * (monthlyNet * 12 / 365);
     }
 
-    // 1. Balance in Calculator (neutral text color)
     calcBalanceWithoutGoals.textContent = formatCurrency(projectedBalance);
     calcBalanceWithoutGoals.classList.remove('price-green', 'price-red');
 
-    // 2. Reached Goals
     if (!calcGoalsList) return;
     calcGoalsList.innerHTML = '';
 
@@ -863,7 +837,6 @@ function escapeHtml(str: string): string {
     return div.innerHTML;
 }
 
-// Slider transitions
 function changeSlide(sliderId: string, targetSlide: number) {
     const slider = document.getElementById(sliderId);
     if (!slider) return;
@@ -893,7 +866,6 @@ function changeSlide(sliderId: string, targetSlide: number) {
     }
 }
 
-// Balance editing modes
 let editingBalanceMode: 'set' | 'add' | 'subtract' = 'set';
 const editBalanceTitle = document.getElementById('edit-balance-title');
 const editBalanceLabel = document.getElementById('edit-balance-label');
@@ -923,7 +895,6 @@ function setupSliderNavigation(btnId: string, sliderId: string, slideIndex: numb
     }
 }
 
-// Navigation bindings
 setupSliderNavigation('btn-edit-balance', 'balance-slider', 1);
 setupSliderNavigation('btn-add-funds', 'balance-slider', 1);
 setupSliderNavigation('btn-subtract-funds', 'balance-slider', 1);
@@ -940,27 +911,20 @@ setupSliderNavigation('btn-save-expense-edit', 'expenses-slider', 0);
 setupSliderNavigation('btn-to-add-expense', 'expenses-slider', 2);
 setupSliderNavigation('btn-cancel-add-expense', 'expenses-slider', 1);
 
-// Settings navigation:
-// Branch 1: Appearance
 setupSliderNavigation('btn-to-appearance', 'profile-slider', 1);
 setupSliderNavigation('btn-back-to-profile', 'profile-slider', 0);
 
-// Branch 2: Currency (NEW!)
 setupSliderNavigation('btn-to-currency', 'profile-slider', 2);
 setupSliderNavigation('btn-back-to-profile-currency', 'profile-slider', 0);
 
-// Branch 3: Edit Avatar (formerly Edit Profile)
 setupSliderNavigation('btn-to-edit-profile', 'profile-slider', 3);
 
-// Branch 4: API Key
 setupSliderNavigation('btn-to-api-key', 'profile-slider', 4);
 setupSliderNavigation('btn-back-to-profile-api', 'profile-slider', 0);
 
-// Branch 5: Reset Data
 setupSliderNavigation('btn-to-reset', 'profile-slider', 5);
 setupSliderNavigation('btn-cancel-reset', 'profile-slider', 0);
 
-// Cancel balance
 const btnCancelBalance = document.getElementById('btn-cancel-balance');
 if (btnCancelBalance) {
     btnCancelBalance.addEventListener('click', () => {
@@ -970,7 +934,6 @@ if (btnCancelBalance) {
     });
 }
 
-// Save balance
 const btnSaveBalance = document.getElementById('btn-save-balance');
 function handleSaveBalance() {
     if (!inputBalance) return;
@@ -987,7 +950,6 @@ function handleSaveBalance() {
             currentBalance = val;
             addBalanceActivity('set', val);
         }
-        // Limit balance to 6 digits [-999999, +999999]
         currentBalance = Math.max(-999999, Math.min(999999, currentBalance));
         updateBalanceUI();
     }
@@ -1006,7 +968,6 @@ if (btnSaveBalance && inputBalance) {
     });
 }
 
-// Goals add / edit
 let editingGoalIndex: number | null = null;
 const inputGoalName = document.getElementById('input-goal-name') as HTMLInputElement | null;
 const btnSubmitGoal = document.getElementById('btn-submit-goal');
@@ -1063,7 +1024,6 @@ if (btnSubmitGoal && inputGoalName && inputGoalPrice) {
     });
 }
 
-// Event delegation for goal edits / deletes
 if (modalGoalsListEdit) {
     modalGoalsListEdit.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
@@ -1092,7 +1052,6 @@ if (modalGoalsListEdit) {
     });
 }
 
-// Income add / edit
 let editingIncomeIndex: number | null = null;
 const inputIncomeName = document.getElementById('input-income-name') as HTMLInputElement | null;
 const btnSubmitIncome = document.getElementById('btn-submit-income');
@@ -1177,7 +1136,6 @@ if (modalIncomeListEdit) {
     });
 }
 
-// Expenses add / edit
 let editingExpenseIndex: number | null = null;
 const inputExpenseName = document.getElementById('input-expense-name') as HTMLInputElement | null;
 const btnSubmitExpense = document.getElementById('btn-submit-expense');
@@ -1262,7 +1220,6 @@ if (modalExpenseListEdit) {
     });
 }
 
-// Avatar Circle Component (Edit Avatar)
 const inputAvatarSymbol = document.getElementById('input-avatar-symbol') as HTMLInputElement | null;
 const btnSaveAvatar = document.getElementById('btn-save-avatar');
 const btnBackToProfileAvatar = document.getElementById('btn-back-to-profile-avatar');
@@ -1317,7 +1274,6 @@ function setAvatarSymbol(symbol: string) {
     if (inputAvatarSymbol) inputAvatarSymbol.value = avatarSymbol;
 }
 
-// API Key Settings
 const inputApiKey = document.getElementById('input-api-key') as HTMLInputElement | null;
 const btnSaveApiKey = document.getElementById('btn-save-api-key');
 if (btnSaveApiKey && inputApiKey) {
@@ -1338,7 +1294,6 @@ if (btnSaveApiKey && inputApiKey) {
     });
 }
 
-// Reset Data
 const btnConfirmReset = document.getElementById('btn-confirm-reset');
 if (btnConfirmReset) {
     btnConfirmReset.addEventListener('click', () => {
@@ -1375,7 +1330,6 @@ if (btnConfirmReset) {
     });
 }
 
-// Appearance Theme Settings
 const btnLightMode = document.getElementById('btn-light-mode');
 const btnDarkMode = document.getElementById('btn-dark-mode');
 
@@ -1409,9 +1363,6 @@ if (localStorage.getItem('piggi_theme') === 'dark') {
 
 updateCurrencyCheckmarks();
 
-// ----------------------------------------------------
-// PiggiAI Repaired Logic & Mask
-// ----------------------------------------------------
 
 function openAiModal() {
     if (!modalAi) return;
@@ -1448,7 +1399,6 @@ if (mainInput) {
     });
 }
 
-// Suggestion chips
 const suggestionChips = document.getElementById('suggestion-chips');
 if (suggestionChips) {
     suggestionChips.addEventListener('click', (e) => {
@@ -1524,7 +1474,6 @@ function removeAiTyping() {
 function executeAction(act: any): string | null {
     if (!act || !act.action) return null;
 
-    // Helper to sanitize name to max 18 chars
     const sanitizeName = (rawName: any) => {
         if (!rawName || typeof rawName !== 'string') return '';
         const trimmed = rawName.trim();
@@ -1721,47 +1670,40 @@ async function callHackClubAiDirectly(userPrompt: string, rawKey: string, system
     ];
     let lastErr: any = null;
 
-    const endpoints = [
-        'https://ai.hackclub.com/proxy/v1/chat/completions',
-        'https://corsproxy.io/?url=' + encodeURIComponent('https://ai.hackclub.com/proxy/v1/chat/completions')
-    ];
-
     for (const model of models) {
-        for (const url of endpoints) {
-            try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify({
-                        model,
-                        messages: [
-                            { role: 'system', content: systemPrompt },
-                            { role: 'user', content: userPrompt }
-                        ]
-                    })
-                });
+        try {
+            const res = await fetch('https://ai.hackclub.com/proxy/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ]
+                })
+            });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    const rawText = data.choices?.[0]?.message?.content?.trim() || '{}';
-                    try {
-                        return JSON.parse(rawText);
-                    } catch {
-                        const match = rawText.match(/\{[\s\S]*\}/);
-                        if (match) return JSON.parse(match[0]);
-                        return { reply: rawText, actions: [] };
-                    }
-                } else {
-                    const errData = await res.json().catch(() => ({}));
-                    const errMsg = errData?.error?.message || errData?.error || `API error ${res.status}`;
-                    lastErr = new Error(errMsg);
+            if (res.ok) {
+                const data = await res.json();
+                const rawText = data.choices?.[0]?.message?.content?.trim() || '{}';
+                try {
+                    return JSON.parse(rawText);
+                } catch {
+                    const match = rawText.match(/\{[\s\S]*\}/);
+                    if (match) return JSON.parse(match[0]);
+                    return { reply: rawText, actions: [] };
                 }
-            } catch (e: any) {
-                lastErr = e;
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                const errMsg = errData?.error?.message || errData?.error || `API error ${res.status}`;
+                lastErr = new Error(errMsg);
             }
+        } catch (e: any) {
+            lastErr = e;
         }
     }
     throw lastErr || new Error('Failed to reach Hack Club AI');
@@ -1851,25 +1793,9 @@ ${JSON.stringify(getFinancialContext(), null, 2)}
 Provide only valid JSON. If no database action is needed, return empty actions array [].`;
 
     if (isGeminiKey(apiKey)) {
-        try {
-            return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
-        } catch (e) {
-            try {
-                return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
-            } catch {
-                throw e;
-            }
-        }
+        return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
     } else {
-        try {
-            return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
-        } catch (e) {
-            try {
-                return await callGeminiDirectlyWithPrompt(userPrompt, apiKey, systemPrompt);
-            } catch {
-                throw e;
-            }
-        }
+        return await callHackClubAiDirectly(userPrompt, apiKey, systemPrompt);
     }
 }
 
@@ -1877,7 +1803,6 @@ function formatAiErrorMessage(err: any): string {
     const raw = typeof err === 'string' ? err : (err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err || '')));
     const lower = raw.toLowerCase();
 
-    // 1. Case 1: API Key is empty / missing
     if (
         lower.includes('key_empty') ||
         lower.includes('no api key') ||
@@ -1890,7 +1815,17 @@ function formatAiErrorMessage(err: any): string {
         return 'Please enter your API key in Settings > API Key to use PiggiAI.';
     }
 
-    // 2. Case 2: All other errors
+    if (
+        lower.includes('cors') ||
+        lower.includes('failed to fetch') ||
+        lower.includes('networkerror')
+    ) {
+        if (window.location.hostname.includes('github.io')) {
+            return 'CORS-Fehler: GitHub Pages ist ein rein statischer Host ohne Node.js-Backend. Die Hack Club API erlaubt aus Sicherheitsgründen keine direkten Browser-Aufrufe (CORS). Nutze entweder einen kostenlosen Google Gemini Key (funktioniert direkt auf GitHub Pages) oder hoste die App mit Backend auf Vercel oder Render.';
+        }
+        return 'CORS/Netzwerkfehler: Hack Club AI blockiert direkte Browser-Anfragen. Bitte nutze einen Google Gemini API-Key oder starte die App mit Backend.';
+    }
+
     return 'Request failed. Please check your API key in Settings > API Key or try again later.';
 }
 
@@ -1963,7 +1898,6 @@ async function handleSendAiMessage() {
         let data: any = null;
         let responseSuccess = false;
 
-        // First attempt server-side proxy
         try {
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -1980,10 +1914,8 @@ async function handleSendAiMessage() {
                 responseSuccess = true;
             }
         } catch {
-            // Server proxy failed or network issue, fallback to direct client call below
         }
 
-        // Fallback with client key if proxy didn't succeed
         if (!responseSuccess) {
             data = await callAiDirectly(userPrompt, activeKey);
             responseSuccess = true;
@@ -1998,7 +1930,6 @@ async function handleSendAiMessage() {
                 const badge = executeAction(act);
                 if (badge) actionBadges.push(badge);
             });
-            // Update all views after actions
             updateBalanceUI();
             renderBalanceHistory();
             renderStats();
@@ -2029,7 +1960,6 @@ if (sendBtn) {
     });
 }
 
-// Initial UI updates (single clean pass)
 initCalculator();
 updateBalanceUI();
 renderIncome();

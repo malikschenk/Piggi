@@ -160,7 +160,7 @@ body {
 }
 
 .tr-card:hover {
-    /* No jumping / movement */
+    
 }
 
 .card-label {
@@ -312,7 +312,7 @@ body.dark-mode #send-btn.active {
     color: #ffffff;
 }
 
-/* Modals & Overlays */
+
 .modal-overlay {
     position: absolute;
     top: 0;
@@ -351,7 +351,7 @@ body.dark-mode #send-btn.active {
     transform: translateY(0);
 }
 
-/* PiggiAI Repaired Mask & Modal */
+
 .ai-modal-overlay {
     background-color: transparent !important;
     z-index: 110;
@@ -459,7 +459,7 @@ body.dark-mode #send-btn.active {
     -webkit-overflow-scrolling: touch;
 }
 
-/* Chat container inside PiggiAI modal */
+
 .chat-container {
     flex: 1;
     overflow-y: auto;
@@ -607,7 +607,7 @@ body.dark-mode .chat-msg-ai.chat-msg-error {
     color: #d94141;
 }
 
-/* AI Typing Indicator */
+
 .ai-typing-indicator {
     align-self: flex-start;
     display: flex;
@@ -702,7 +702,7 @@ body.dark-mode .chat-msg-ai.chat-msg-error {
 .sheet-slider:not(.profile-tree-slider)[data-active-slide="1"] .sheet-slides { transform: translateX(-33.333%); }
 .sheet-slider:not(.profile-tree-slider)[data-active-slide="2"] .sheet-slides { transform: translateX(-66.666%); }
 
-/* Profile tree slider */
+
 .profile-tree-slider .sheet-slides { width: 200%; }
 .profile-tree-slider .main-settings-slide { width: 50%; }
 .profile-tree-slider .branch-slides-container { width: 50%; position: relative; height: 100%; }
@@ -729,7 +729,7 @@ body.dark-mode .chat-msg-ai.chat-msg-error {
 .profile-tree-slider[data-active-slide="0"] .sheet-slides { transform: translateX(0%); }
 .profile-tree-slider[data-active-slide="1"] .sheet-slides { transform: translateX(-50%); }
 
-/* Avatar Edit Circle Component */
+
 .avatar-branch-content {
     display: flex;
     flex-direction: column;
@@ -863,7 +863,7 @@ body.dark-mode .checkmark { color: #ffffff; }
 
 .arrow { color: #888888; font-size: 20px; }
 
-/* Dark Mode Styles */
+
 body.dark-mode {
     background-color: #1a1a1a;
     color: #ffffff;
@@ -997,7 +997,7 @@ body.dark-mode .ai-close-icon-btn:hover {
 
 body.dark-mode .empty-state { color: #aaaaaa; }
 
-/* Stats Card on Main Dashboard */
+
 .stats-preview-container {
     display: flex;
     justify-content: space-between;
@@ -1031,7 +1031,7 @@ body.dark-mode .stats-rate-badge {
     color: #ffffff;
 }
 
-/* Calculator Card on Main Dashboard */
+
 .calculator-preview-container {
     display: flex;
     justify-content: space-between;
@@ -1053,7 +1053,7 @@ body.dark-mode .stats-rate-badge {
     font-variant-numeric: tabular-nums;
 }
 
-/* Balance History List in Balance Modal */
+
 .balance-history-list {
     display: flex;
     flex-direction: column;
@@ -1095,7 +1095,7 @@ body.dark-mode .activity-date {
     font-variant-numeric: tabular-nums;
 }
 
-/* Balance Action Buttons in Balance Sheet */
+
 .balance-action-buttons {
     margin-top: auto;
     padding-top: 24px;
@@ -1123,7 +1123,7 @@ body.dark-mode .activity-date {
     justify-content: center;
 }
 
-/* Stats Modal Styling */
+
 .stats-modal-content {
     display: flex;
     flex-direction: column;
@@ -1248,7 +1248,7 @@ body.dark-mode .stats-reach-date {
     color: #aaaaaa;
 }
 
-/* Calculator Modal Styling */
+
 .calculator-modal-content {
     display: flex;
     flex-direction: column;
